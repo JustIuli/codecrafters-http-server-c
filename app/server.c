@@ -1,22 +1,19 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <sys/socket.h>
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
-
 int main() {
+    // Disable output buffering
+    setbuf(stdout, NULL);
     // You can use print statements as follows for debugging, they'll be visible
     // when running tests.
     printf("Logs from your program will appear here!\n");
     // Uncomment this block to pass the first stage
-    //
-    int server_fd;
-    int client_addr_len;
+    int server_fd, client_addr_len;
     struct sockaddr_in client_addr;
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
@@ -26,17 +23,17 @@ int main() {
     // Since the tester restarts your program quite often, setting REUSE_PORT
     // ensures that we don't run into 'Address already in use' errors
     int reuse = 1;
-    // Code that uses SO_REUSEPORT
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse)) <
         0) {
         printf("SO_REUSEPORT failed: %s \n", strerror(errno));
         return 1;
     }
-    struct sockaddr_in serv_addr;
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(4221);
-    serv_addr.sin_addr.s_addr = INADDR_ANY;
-    if (bind(server_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) != 0) {
+    struct sockaddr_in serv_addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(4221),
+            .sin_addr = {htonl(INADDR_ANY)},
+    };
+    if (bind(server_fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) != 0) {
         printf("Bind failed: %s \n", strerror(errno));
         return 1;
     }
@@ -47,12 +44,11 @@ int main() {
     }
     printf("Waiting for a client to connect...\n");
     client_addr_len = sizeof(client_addr);
-    accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
-    int client_socket_fd =
-            accept(server_fd, (struct sockaddr *) &client_addr, &client_addr_len);
+    accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
+    int client_fd =
+            accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_len);
     printf("Client connected\n");
-    char response[] = "HTTP/1.1 200 OK\r\n\r\n";
-    send(client_socket_fd, response, sizeof(response), 0);
+    write(client_fd, "HTTP/1.1 200 OK\r\n\r\n", 19);
     close(server_fd);
     return 0;
 }
